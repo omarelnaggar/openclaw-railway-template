@@ -1,0 +1,54 @@
+name: Sync upstream template
+
+on:
+  schedule:
+    - cron: '0 16 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream
+        run: |
+          git remote add upstream https://github.com/chrysb/openclaw-railway-template.git || true
+          git fetch upstream
+
+      - name: Create sync branch
+        run: |
+          BRANCH="upstream-sync-${GITHUB_RUN_ID}"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          git checkout -b "$BRANCH"
+          git merge upstream/main --no-edit || true
+
+      - name: Push sync branch
+        run: |
+          git push origin "$BRANCH"
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ env.BRANCH }}
+          base: main
+          title: "chore: sync upstream template"
+          body: |
+            Automated weekly sync from `chrysb/openclaw-railway-template`.
+            Review and merge when ready.
+          labels: |
+            automated
+            upstream-sync
